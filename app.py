@@ -23,7 +23,7 @@ else:
     model, scaler = None, None
     print("❌ Model or scaler not loaded. Check the path or train the model again.")
 
-EMOTIONS = ['neutral', 'happy', 'sad', 'angry', 'fearful', 'disgust', 'surprised']
+EMOTIONS = ['neutral', 'calm', 'angry', 'HAPPY', 'SAD', 'fearful', 'disgust', 'surprised']
 
 @app.route('/')
 def home():
@@ -58,21 +58,34 @@ def record_and_predict():
     return render_template('record.html')
 
 def extract_features(file_path):
-    y, sr = librosa.load(file_path, sr=None)
+    y, sr = librosa.load(file_path, sr=16000)
 
-    # Extract MFCCs, Chroma, Mel Spectrogram, Spectral Contrast (160 features)
+    # Trim silence
+    y, _ = librosa.effects.trim(y)
+
+    # Extract MFCCs, Chroma, Mel Spectrogram, Spectral Contrast
     mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     mel = librosa.feature.melspectrogram(y=y, sr=sr)
     contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
 
-    # Combine features into a 160-dimensional array
+    # Additional features
+    zcr = librosa.feature.zero_crossing_rate(y).mean()
+    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr).mean()
+    bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr).mean()
+
+    # Combine features into a 163-dimensional array
     combined_features = np.hstack((
         np.mean(mfccs, axis=1),
         np.mean(chroma, axis=1),
         np.mean(mel, axis=1),
-        np.mean(contrast, axis=1)
+        np.mean(contrast, axis=1),
+        zcr,
+        rolloff,
+        bandwidth
     ))
+
+    print(f"Extracted features (163-dim) for {file_path}: {combined_features.shape}")
 
     return combined_features
 
